@@ -246,24 +246,29 @@ bool ts::EMMGClient::connect(const SocketAddress& mux,
     // Cleanup response state.
     cleanupResponse();
 
-    // Send a stream_setup message to MUX.
-    emmgmux::StreamSetup stream_setup;
-    stream_setup.channel_id = data_channel_id;
-    stream_setup.stream_id = data_stream_id;
-    stream_setup.client_id = client_id;
-    stream_setup.data_id = data_id;
-    stream_setup.data_type = data_type;
-    if (!_connection.send(stream_setup, _logger)) {
-        return abortConnection();
-    }
+    for (int i = 0; i < 10; ++i) {
+        // Send a stream_setup message to MUX.
+        emmgmux::StreamSetup stream_setup;
+        stream_setup.channel_id = data_channel_id;
+        stream_setup.stream_id = data_stream_id + i;
+        stream_setup.client_id = client_id;
+        stream_setup.data_id = data_id + i;
+        stream_setup.data_type = i % 2;
+        if (!_connection.send(stream_setup, _logger)) {
+            printf("ABORT 1\n");
+            return abortConnection();
+        }
 
-    // Wait for a stream_status from the MUX
-    response = waitResponse();
-    if (response == 0) {
-        return abortConnection(u"MUX stream_setup response timeout");
-    }
-    if (response != emmgmux::Tags::stream_status) {
-        return abortConnection(UString::Format(u"unexpected response 0x%X from MUX (expected stream_status)", {response}));
+        // Wait for a stream_status from the MUX
+        response = waitResponse();
+        if (response == 0) {
+            printf("ABORT 2\n");
+            return abortConnection(u"MUX stream_setup response timeout");
+        }
+        if (response != emmgmux::Tags::stream_status) {
+            printf("ABORT 3\n");
+            return abortConnection(UString::Format(u"unexpected response 0x%X from MUX (expected stream_status)", {response}));
+        }
     }
 
     // Data stream now established
@@ -407,13 +412,16 @@ bool ts::EMMGClient::dataProvision(const void* data, size_t size)
 
 bool ts::EMMGClient::dataProvision(const std::vector<ByteBlockPtr>& data)
 {
+    static int current_offset = 0;
     // Build a data provision message.
     emmgmux::DataProvision request;
     request.channel_id = _stream_status.channel_id;
-    request.stream_id = _stream_status.stream_id;
+    request.stream_id = _stream_status.stream_id + current_offset;
     request.client_id = _stream_status.client_id;
-    request.data_id = _stream_status.data_id;
+    request.data_id = _stream_status.data_id + current_offset;
     request.datagram = data;
+
+    current_offset = (current_offset + 1) % 10;
 
     // Eliminate null pointers, count total data bytes.
     for (auto it = request.datagram.begin(); it != request.datagram.end(); ) {

@@ -518,22 +518,32 @@ int main (int argc, char *argv[])
                         0,
                         opt.logger))
     {
+        printf("COULDNT CONNECT\n");
         return EXIT_FAILURE;
     }
 
     // Request the bandwidth, get allocated bandwidth as returned by the MUX and adjust our bitrates.
-    if (!client.requestBandwidth(opt.requestedBandwidth, true) ||
-        !opt.adjustBandwidth(client.allocatedBandwidth()))
-    {
-        client.disconnect();
-        return EXIT_FAILURE;
+    //if (!client.requestBandwidth(opt.requestedBandwidth, true) ||
+    //    !opt.adjustBandwidth(client.allocatedBandwidth()))
+    //{
+    //    client.disconnect();
+    //    printf("BANDWIDTH FAILURE\n");
+    //    return EXIT_FAILURE;
+    //}
+
+    opt.adjustBandwidth(opt.requestedBandwidth);
+
+    std::vector<std::unique_ptr<EMMGOptions>> opts;
+    std::vector<std::unique_ptr<EMMGSectionProvider>> sectionProvider;
+    std::vector<std::unique_ptr<ts::Packetizer>> packetizer;
+    for (int i = 0; i < 10; ++i) {
+        opts.emplace_back(new EMMGOptions(argc, argv));
+        opts[i]->dataId = opt.dataId + i;
+        opts[i]->streamId = opt.streamId + i;
+        opts[i]->dataType = i % 2;
+        sectionProvider.emplace_back(new EMMGSectionProvider(*opts[i].get()));
+        packetizer.emplace_back(new ts::Packetizer(ts::PID_NULL, sectionProvider.at(i).get()));
     }
-
-    // An object which provides sections to send.
-    EMMGSectionProvider sectionProvider(opt);
-
-    // When working in packet mode, we need a packetizer.
-    ts::Packetizer packetizer(ts::PID_NULL, &sectionProvider);
 
     // Start time.
     ts::Monotonic startTime;
@@ -544,6 +554,7 @@ int main (int argc, char *argv[])
 
     // Send data as long as the maximum is not reached.
     bool ok = true;
+    int currentSec = 0;
     while (ok && client.totalBytes() < opt.maxBytes) {
 
         // Compute the number of bytes we need to send now.
@@ -576,7 +587,8 @@ int main (int argc, char *argv[])
                 while (ok && sendSize < targetSendSize) {
                     // Get one section.
                     ts::SectionPtr sec;
-                    sectionProvider.provideSection(0, sec);
+                    sectionProvider[currentSec]->provideSection(0, sec);
+                    currentSec = (currentSec + 1) % 10;
                     // Getting a null pointer means end of input.
                     ok = !sec.isNull();
                     if (ok) {
@@ -593,7 +605,8 @@ int main (int argc, char *argv[])
                 sendSize = ts::RoundUp<uint64_t>(targetSendSize, ts::PKT_SIZE);
                 ts::TSPacketVector packets(size_t(sendSize / ts::PKT_SIZE));
                 for (size_t i = 0; ok && i < packets.size(); ++i) {
-                    ok = packetizer.getNextPacket(packets[i]);
+                    ok = packetizer[currentSec]->getNextPacket(packets[i]);
+                    currentSec = (currentSec + 1) % 10;
                     if (!ok) {
                         // No more packet, shrink the packet buffer.
                         packets.resize(i);
@@ -614,6 +627,8 @@ int main (int argc, char *argv[])
             currentTime.wait();
         }
     }
+
+    printf("DISCONNECT\n");
 
     // Disconnect from the MUX.
     client.disconnect();
