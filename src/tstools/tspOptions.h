@@ -98,7 +98,7 @@ namespace ts {
 
             // Option values
             bool          timed_log;       //!< Add time stamps in log messages.
-            bool          list_proc;       //!< List processors.
+            int           list_proc_flags; //!< List processors, mask of PluginRepository::ListFlag.
             bool          monitor;         //!< Run a resource monitoring thread.
             bool          ignore_jt;       //!< Ignore "joint termination" options in plugins.
             bool          sync_log;        //!< Synchronous log.
@@ -112,9 +112,16 @@ namespace ts {
             size_t        instuff_stop;    //!< Add input stuffing: add @a instuff_end null packets after end of actual input.
             BitRate       bitrate;         //!< Fixed input bitrate.
             MilliSecond   bitrate_adj;     //!< Bitrate adjust interval.
+            Tristate      realtime;        //!< Use real-time options.
             PluginOptions input;           //!< Input plugin.
             PluginOptions output;          //!< Output plugin.
             PluginOptionsVector plugins;   //!< List of packet processor plugins.
+
+            //!
+            //! Apply default values to options which were not specified on the command line.
+            //! @param [in] realtime If true, apply real-time defaults. If false, apply offline defaults.
+            //!
+            void applyDefaults(bool realtime);
 
             //!
             //! Display the content of this object to a stream.
@@ -128,6 +135,11 @@ namespace ts {
             Options() = delete;
             Options(const Options&) = delete;
             Options& operator=(const Options&) = delete;
+
+            //!
+            //! Options for -\-list-processor.
+            //!
+            static const Enumeration ListProcessorEnum;
 
             //!
             //! Search the next plugin option.

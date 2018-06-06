@@ -63,6 +63,7 @@ namespace ts {
         virtual ~IPInput();
         virtual bool start() override;
         virtual bool stop() override;
+        virtual bool isRealTime() override {return true;}
         virtual BitRate getBitrate() override;
         virtual size_t receive(TSPacket*, size_t) override;
 
@@ -96,6 +97,7 @@ namespace ts {
         virtual ~IPOutput();
         virtual bool start() override;
         virtual bool stop() override;
+        virtual bool isRealTime() override {return true;}
         virtual bool send(const TSPacket*, size_t) override;
 
     private:
@@ -119,7 +121,7 @@ TSPLUGIN_DECLARE_OUTPUT(ip, ts::IPOutput)
 //----------------------------------------------------------------------------
 
 ts::IPInput::IPInput(TSP* tsp_) :
-    InputPlugin(tsp_, u"Receive TS packets from UDP/IP, multicast or unicast.", u"[options] [address:]port"),
+    InputPlugin(tsp_, u"Receive TS packets from UDP/IP, multicast or unicast", u"[options] [address:]port"),
     _sock(*tsp_),
     _eval_time(0),
     _display_time(0),
@@ -170,7 +172,7 @@ ts::IPInput::IPInput(TSP* tsp_) :
 //----------------------------------------------------------------------------
 
 ts::IPOutput::IPOutput(TSP* tsp_) :
-    OutputPlugin(tsp_, u"Send TS packets using UDP/IP, multicast or unicast.", u"[options] address:port"),
+    OutputPlugin(tsp_, u"Send TS packets using UDP/IP, multicast or unicast", u"[options] address:port"),
     _sock(false, *tsp_),
     _pkt_burst(DEF_PACKET_BURST)
 {

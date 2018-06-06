@@ -55,6 +55,7 @@ namespace ts {
         PlayPlugin(TSP*);
         virtual bool start() override;
         virtual bool stop() override;
+        virtual bool isRealTime() override {return true;}
         virtual bool send(const TSPacket*, size_t) override;
 
     private:
@@ -81,7 +82,7 @@ TSPLUGIN_DECLARE_OUTPUT(play, ts::PlayPlugin)
 //----------------------------------------------------------------------------
 
 ts::PlayPlugin::PlayPlugin(TSP* tsp_) :
-    OutputPlugin(tsp_, u"Play output TS on any supported media player in the system.", u"[options]"),
+    OutputPlugin(tsp_, u"Play output TS on any supported media player in the system", u"[options]"),
     _use_mplayer(false),
     _use_xine(false),
     _pipe()
@@ -276,5 +277,5 @@ bool ts::PlayPlugin::start()
     // Create pipe & process
     tsp->verbose(u"using media player command: %s", {command});
     _pipe.setIgnoreAbort(false);
-    return _pipe.open(command, ForkPipe::SYNCHRONOUS, PIPE_BUFFER_SIZE, *tsp);
+    return _pipe.open(command, ForkPipe::SYNCHRONOUS, PIPE_BUFFER_SIZE, *tsp, ForkPipe::KEEP_BOTH, ForkPipe::STDIN_PIPE);
 }

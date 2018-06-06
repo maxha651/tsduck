@@ -34,11 +34,15 @@
 #include "tspOptions.h"
 #include "tsSysUtils.h"
 #include "tsAsyncReport.h"
+#include "tsPluginRepository.h"
 TSDUCK_SOURCE;
 
-#define DEF_BUFSIZE_MB           16  // mega-bytes
-#define DEF_BITRATE_INTERVAL      5  // seconds
-#define DEF_MAX_FLUSH_PKT     10000  // packets
+#define DEF_BUFSIZE_MB            16  // mega-bytes
+#define DEF_BITRATE_INTERVAL       5  // seconds
+#define DEF_MAX_FLUSH_PKT_OFL  10000  // packets
+#define DEF_MAX_FLUSH_PKT_RT    1000  // packets
+#define DEF_MAX_INPUT_PKT_OFL      0  // packets
+#define DEF_MAX_INPUT_PKT_RT    1000  // packets
 
 // Displayable names of plugin types.
 const ts::Enumeration ts::tsp::Options::PluginTypeNames({
@@ -47,14 +51,24 @@ const ts::Enumeration ts::tsp::Options::PluginTypeNames({
     {u"packet processor", ts::tsp::Options::PROCESSOR},
 });
 
+// Options for --list-processor.
+//!
+const ts::Enumeration ts::tsp::Options::ListProcessorEnum({
+    {u"all",    ts::PluginRepository::LIST_ALL},
+    {u"input",  ts::PluginRepository::LIST_INPUT  | ts::PluginRepository::LIST_COMPACT},
+    {u"output", ts::PluginRepository::LIST_OUTPUT | ts::PluginRepository::LIST_COMPACT},
+    {u"packet", ts::PluginRepository::LIST_PACKET | ts::PluginRepository::LIST_COMPACT},
+});
+
 
 //----------------------------------------------------------------------------
 // Constructor from command line options
 //----------------------------------------------------------------------------
 
 ts::tsp::Options::Options(int argc, char *argv[]) :
+    Args(),
     timed_log(false),
-    list_proc(false),
+    list_proc_flags(0),
     monitor(false),
     ignore_jt(false),
     sync_log(false),
@@ -68,22 +82,24 @@ ts::tsp::Options::Options(int argc, char *argv[]) :
     instuff_stop(0),
     bitrate(0),
     bitrate_adj(0),
+    realtime(MAYBE),
     input(),
     output(),
     plugins()
 {
-    option(u"add-input-stuffing",       'a', Args::STRING);
-    option(u"add-start-stuffing",        0,  Args::UNSIGNED);
-    option(u"add-stop-stuffing",         0,  Args::UNSIGNED);
-    option(u"bitrate",                  'b', Args::POSITIVE);
-    option(u"bitrate-adjust-interval",   0,  Args::POSITIVE);
-    option(u"buffer-size-mb",            0,  Args::POSITIVE);
+    option(u"add-input-stuffing",       'a', STRING);
+    option(u"add-start-stuffing",        0,  UNSIGNED);
+    option(u"add-stop-stuffing",         0,  UNSIGNED);
+    option(u"bitrate",                  'b', POSITIVE);
+    option(u"bitrate-adjust-interval",   0,  POSITIVE);
+    option(u"buffer-size-mb",            0,  POSITIVE);
     option(u"ignore-joint-termination", 'i');
-    option(u"list-processors",          'l');
-    option(u"log-message-count",         0,  Args::POSITIVE);
-    option(u"max-flushed-packets",       0,  Args::POSITIVE);
-    option(u"max-input-packets",         0,  Args::POSITIVE);
+    option(u"list-processors",          'l', ListProcessorEnum, 0, 1, true);
+    option(u"log-message-count",         0,  POSITIVE);
+    option(u"max-flushed-packets",       0,  POSITIVE);
+    option(u"max-input-packets",         0,  POSITIVE);
     option(u"no-realtime-clock",         0); // was a temporary workaround, now ignored
+    option(u"realtime",                 'r', TRISTATE, 0, 1, -255, 256, true);
     option(u"monitor",                  'm');
     option(u"synchronous-log",          's');
     option(u"timed-log",                't');
@@ -102,17 +118,19 @@ ts::tsp::Options::Options(int argc, char *argv[]) :
 #define HELP_SEEMAN   u" See the man page of dlopen(3) for more details."
 #endif
 
-    setDescription(u"MPEG Transport Stream Processor: Receive a TS from a user-specified input\n"
-                   u"plug-in, apply MPEG packet processing through several user-specified packet\n"
-                   u"processor plug-in's and send the processed stream to a user-specified output\n"
-                   u"plug-in. All input, processors and output plug-in's are " HELP_SHLIBS u".");
+    setDescription(u"MPEG transport stream processor using a chain of plugins");
 
-    setSyntax(u" [tsp-options] \\\n"
+    setSyntax(u"[tsp-options] \\\n"
               u"    [-I input-name [input-options]] \\\n"
               u"    [-P processor-name [processor-options]] ... \\\n"
               u"    [-O output-name [output-options]]");
 
-    setHelp(u"All tsp-options must be placed on the command line before the input,\n"
+    setHelp(u"The transport stream processor receives a TS from a user-specified input\n"
+            u"plug-in, apply MPEG packet processing through several user-specified packet\n"
+            u"processor plug-in's and send the processed stream to a user-specified output\n"
+            u"plug-in. All input, processors and output plug-in's are " HELP_SHLIBS u".\n"
+            u"\n"
+            u"All tsp-options must be placed on the command line before the input,\n"
             u"processors and output specifications. The tsp-options are:\n"
             u"\n"
             u"  -a nullpkt/inpkt\n"
@@ -185,19 +203,31 @@ ts::tsp::Options::Options(int argc, char *argv[]) :
             u"  --max-flushed-packets value\n"
             u"      Specify the maximum number of packets to be processed before flushing\n"
             u"      them to the next processor or the output. When the processing time\n"
-            u"      is high and some packets are lost, try decreasing this value.\n"
-            u"      The default is " TS_USTRINGIFY(DEF_MAX_FLUSH_PKT) u" packets.\n"
+            u"      is high and some packets are lost, try decreasing this value. The default\n"
+            u"      is " + UString::Decimal(DEF_MAX_FLUSH_PKT_OFL) + u" packets in offline mode and " +
+            UString::Decimal(DEF_MAX_FLUSH_PKT_RT) + u" in real-time mode.\n"
             u"\n"
             u"  --max-input-packets value\n"
             u"      Specify the maximum number of packets to be received at a time from\n"
-            u"      the input plug-in. By default, tsp reads as many packets as it can,\n"
-            u"      depending on the free space in the buffer.\n"
+            u"      the input plug-in. By default, in offline mode, tsp reads as many packets\n"
+            u"      as it can, depending on the free space in the buffer. In real-time mode,\n"
+            u"      the default is " + UString::Decimal(DEF_MAX_INPUT_PKT_RT) + u" packets.\n"
             u"\n"
             u"  -m\n"
             u"  --monitor\n"
             u"      Continuously monitor the system resources which are used by tsp.\n"
             u"      This includes CPU load, virtual memory usage. Useful to verify the\n"
             u"      stability of the application.\n"
+            u"\n"
+            u"  -r[value]\n"
+            u"  --realtime[=value]\n"
+            u"      Specifies if tsp and all plugins should use default values for real-time\n"
+            u"      or offline processing. By default, if any plugin prefers real-time, the\n"
+            u"      real-time defaults are used. If no plugin prefers real-time, the offline\n"
+            u"      default are used. If -r or --realtime is used alone, the real-time defaults\n"
+            u"      are enforced. The explicit values 'no', 'false', 'off' are used to enforce\n"
+            u"      the offline defaults and the explicit values 'yes', 'true', 'on' are used\n"
+            u"      to enforce the real-time defaults.\n"
             u"\n"
             u"  -s\n"
             u"  --synchronous-log\n"
@@ -275,18 +305,19 @@ ts::tsp::Options::Options(int argc, char *argv[]) :
     analyze(app_name, UStringVector(args.begin(), args.begin() + plugin_index), false);
 
     timed_log = present(u"timed-log");
-    list_proc = present(u"list-processors");
+    list_proc_flags = present(u"list-processors") ? intValue<int>(u"list-processors", PluginRepository::LIST_ALL) : 0;
     monitor = present(u"monitor");
     sync_log = present(u"synchronous-log");
     bufsize = 1024 * 1024 * intValue<size_t>(u"buffer-size-mb", DEF_BUFSIZE_MB);
     bitrate = intValue<BitRate>(u"bitrate", 0);
     bitrate_adj = MilliSecPerSec * intValue(u"bitrate-adjust-interval", DEF_BITRATE_INTERVAL);
-    max_flush_pkt = intValue<size_t>(u"max-flushed-packets", DEF_MAX_FLUSH_PKT);
+    max_flush_pkt = intValue<size_t>(u"max-flushed-packets", 0);
     max_input_pkt = intValue<size_t>(u"max-input-packets", 0);
     instuff_start = intValue<size_t>(u"add-start-stuffing", 0);
     instuff_stop = intValue<size_t>(u"add-stop-stuffing", 0);
     log_msg_count = intValue<size_t>(u"log-message-count", AsyncReport::MAX_LOG_MESSAGES);
     ignore_jt = present(u"ignore-joint-termination");
+    realtime = tristateValue(u"realtime");
 
     if (present(u"add-input-stuffing") && !value(u"add-input-stuffing").scan(u"%d/%d", {&instuff_nullpkt, &instuff_inpkt})) {
         error(u"invalid value for --add-input-stuffing, use \"nullpkt/inpkt\" format");
@@ -363,6 +394,22 @@ ts::tsp::Options::Options(int argc, char *argv[]) :
 
 
 //----------------------------------------------------------------------------
+// Apply default values to options which were not specified.
+//----------------------------------------------------------------------------
+
+void ts::tsp::Options::applyDefaults(bool rt)
+{
+    if (max_flush_pkt == 0) {
+        max_flush_pkt = rt ? DEF_MAX_FLUSH_PKT_RT : DEF_MAX_FLUSH_PKT_OFL;
+    }
+    if (max_input_pkt == 0) {
+        max_input_pkt = rt ? DEF_MAX_INPUT_PKT_RT: DEF_MAX_INPUT_PKT_OFL;
+    }
+    debug(u"using --max-input-packets %'d --max-flushed-packets %'d", {max_input_pkt, max_flush_pkt});
+}
+
+
+//----------------------------------------------------------------------------
 // Search the next plugin option.
 //----------------------------------------------------------------------------
 
@@ -402,9 +449,10 @@ std::ostream& ts::tsp::Options::display(std::ostream& strm, int indent) const
          << margin << "  --bitrate-adjust-interval: " << UString::Decimal(bitrate_adj) << " milliseconds" << std::endl
          << margin << "  --buffer-size-mb: " << UString::Decimal(bufsize) << " bytes" << std::endl
          << margin << "  --debug: " << maxSeverity() << std::endl
-         << margin << "  --list-processors: " << list_proc << std::endl
+         << margin << "  --list-processors: " << list_proc_flags << std::endl
          << margin << "  --max-flushed-packets: " << UString::Decimal(max_flush_pkt) << std::endl
          << margin << "  --max-input-packets: " << UString::Decimal(max_input_pkt) << std::endl
+         << margin << "  --realtime: " << UString::TristateTrueFalse(realtime) << std::endl
          << margin << "  --monitor: " << monitor << std::endl
          << margin << "  --verbose: " << verbose() << std::endl
          << margin << "  Number of packet processors: " << plugins.size() << std::endl

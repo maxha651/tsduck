@@ -1,29 +1,29 @@
 //----------------------------------------------------------------------------
 //
-//  TSDuck - The MPEG Transport Stream Toolkit
-//  Copyright (c) 2005-2018, Thierry Lelegard
-//  All rights reserved.
+// TSDuck - The MPEG Transport Stream Toolkit
+// Copyright (c) 2005-2018, Thierry Lelegard
+// All rights reserved.
 //
-//  Redistribution and use in source and binary forms, with or without
-//  modification, are permitted provided that the following conditions are met:
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are met:
 //
-//  1. Redistributions of source code must retain the above copyright notice,
-//     this list of conditions and the following disclaimer.
-//  2. Redistributions in binary form must reproduce the above copyright
-//     notice, this list of conditions and the following disclaimer in the
-//     documentation and/or other materials provided with the distribution.
+// 1. Redistributions of source code must retain the above copyright notice,
+//    this list of conditions and the following disclaimer.
+// 2. Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
 //
-//  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-//  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-//  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-//  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
-//  LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-//  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-//  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-//  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-//  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-//  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
-//  THE POSSIBILITY OF SUCH DAMAGE.
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+// THE POSSIBILITY OF SUCH DAMAGE.
 //
 //----------------------------------------------------------------------------
 
@@ -63,6 +63,7 @@
 #include "tsAsyncReport.h"
 #include "tsAudioAttributes.h"
 #include "tsAudioLanguageOptions.h"
+#include "tsAudioStreamDescriptor.h"
 #include "tsAVCAttributes.h"
 #include "tsAVCHRDParameters.h"
 #include "tsAVCParser.h"
@@ -92,6 +93,7 @@
 #include "tsComponentDescriptor.h"
 #include "tsCondition.h"
 #include "tsContentDescriptor.h"
+#include "tsCopyrightDescriptor.h"
 #include "tsCountryAvailabilityDescriptor.h"
 #include "tsCPDescriptor.h"
 #include "tsCPIdentifierDescriptor.h"
@@ -104,6 +106,7 @@
 #include "tsCyclingPacketizer.h"
 #include "tsDataBroadcastDescriptor.h"
 #include "tsDataBroadcastIdDescriptor.h"
+#include "tsDataStreamAlignmentDescriptor.h"
 #include "tsDektecControl.h"
 #include "tsDektecInputPlugin.h"
 #include "tsDektecOutputPlugin.h"
@@ -112,9 +115,9 @@
 #include "tsDescriptor.h"
 #include "tsDescriptorList.h"
 #include "tsDIILocationDescriptor.h"
+#include "tsDiscontinuityInformationTable.h"
 #include "tsDoubleCheckLock.h"
 #include "tsDTSDescriptor.h"
-#include "tsduck.h"
 #include "tsDuckProtocol.h"
 #include "tsDVBCharset.h"
 #include "tsDVBCharsetSingleByte.h"
@@ -134,6 +137,7 @@
 #include "tsECMGClient.h"
 #include "tsECMGClientHandlerInterface.h"
 #include "tsECMGSCS.h"
+#include "tsECMRepetitionRateDescriptor.h"
 #include "tsEDID.h"
 #include "tsEIT.h"
 #include "tsEMMGClient.h"
@@ -144,6 +148,7 @@
 #include "tsEutelsatChannelNumberDescriptor.h"
 #include "tsException.h"
 #include "tsExtendedEventDescriptor.h"
+#include "tsExternalESIdDescriptor.h"
 #include "tsFatal.h"
 #include "tsFileNameRate.h"
 #include "tsForkPipe.h"
@@ -155,12 +160,15 @@
 #include "tsHDSimulcastLogicalChannelDescriptor.h"
 #include "tsHEVCTimingAndHRDDescriptor.h"
 #include "tsHEVCVideoDescriptor.h"
+#include "tsHierarchyDescriptor.h"
+#include "tsIBPDescriptor.h"
 #include "tsIDSA.h"
 #include "tsInputRedirector.h"
 #include "tsINT.h"
 #include "tsIntegerUtils.h"
 #include "tsInterruptHandler.h"
 #include "tsIPAddress.h"
+#include "tsIPAddressMask.h"
 #include "tsIPMACGenericStreamLocationDescriptor.h"
 #include "tsIPMACPlatformNameDescriptor.h"
 #include "tsIPMACPlatformProviderNameDescriptor.h"
@@ -188,12 +196,15 @@
 #include "tsMonotonic.h"
 #include "tsMPEDemux.h"
 #include "tsMPEG.h"
+#include "tsMPEG4AudioDescriptor.h"
+#include "tsMPEG4VideoDescriptor.h"
 #include "tsMPEHandlerInterface.h"
 #include "tsMPEPacket.h"
 #include "tsMultilingualBouquetNameDescriptor.h"
 #include "tsMultilingualComponentDescriptor.h"
 #include "tsMultilingualNetworkNameDescriptor.h"
 #include "tsMultilingualServiceNameDescriptor.h"
+#include "tsMultiplexBufferUtilizationDescriptor.h"
 #include "tsMutex.h"
 #include "tsMutexInterface.h"
 #include "tsNames.h"
@@ -208,6 +219,7 @@
 #include "tsOutputRedirector.h"
 #include "tsPacketizer.h"
 #include "tsParentalRatingDescriptor.h"
+#include "tsPartialTransportStreamDescriptor.h"
 #include "tsPAT.h"
 #include "tsPCR.h"
 #include "tsPCRAnalyzer.h"
@@ -254,6 +266,7 @@
 #include "tsSectionFile.h"
 #include "tsSectionHandlerInterface.h"
 #include "tsSectionProviderInterface.h"
+#include "tsSelectionInformationTable.h"
 #include "tsService.h"
 #include "tsServiceAvailabilityDescriptor.h"
 #include "tsServiceDescriptor.h"
@@ -261,6 +274,7 @@
 #include "tsServiceIdentifierDescriptor.h"
 #include "tsServiceListDescriptor.h"
 #include "tsServiceMoveDescriptor.h"
+#include "tsServiceRelocatedDescriptor.h"
 #include "tsSHA1.h"
 #include "tsSHA256.h"
 #include "tsSHA512.h"
@@ -268,6 +282,8 @@
 #include "tsShortEventDescriptor.h"
 #include "tsSimulCryptDate.h"
 #include "tsSingletonManager.h"
+#include "tsSLDescriptor.h"
+#include "tsSmoothingBufferDescriptor.h"
 #include "tsSocket.h"
 #include "tsSocketAddress.h"
 #include "tsSpliceAvailDescriptor.h"
@@ -288,6 +304,7 @@
 #include "tsSubtitlingDescriptor.h"
 #include "tsSupplementaryAudioDescriptor.h"
 #include "tsSysInfo.h"
+#include "tsSystemClockDescriptor.h"
 #include "tsSystemMonitor.h"
 #include "tsSystemRandomGenerator.h"
 #include "tsSysUtils.h"
@@ -303,6 +320,7 @@
 #include "tsTablesLogger.h"
 #include "tsTablesLoggerArgs.h"
 #include "tsTablesPtr.h"
+#include "tsTargetBackgroundGridDescriptor.h"
 #include "tsTargetIPAddressDescriptor.h"
 #include "tsTargetIPSlashDescriptor.h"
 #include "tsTargetIPSourceSlashDescriptor.h"
@@ -332,6 +350,7 @@
 #include "tsTime.h"
 #include "tsTimeShiftedEventDescriptor.h"
 #include "tsTimeShiftedServiceDescriptor.h"
+#include "tsTimeSliceFECIdentifierDescriptor.h"
 #include "tsTimeTrackerDemux.h"
 #include "tstlv.h"
 #include "tstlvAnalyzer.h"
@@ -356,6 +375,7 @@
 #include "tsTSFileOutput.h"
 #include "tsTSFileOutputResync.h"
 #include "tsTSPacket.h"
+#include "tsTSPacketQueue.h"
 #include "tsTSScanner.h"
 #include "tsTSScrambling.h"
 #include "tsTSSpeedMetrics.h"
@@ -381,6 +401,8 @@
 #include "tsVersionInfo.h"
 #include "tsViaccessDate.h"
 #include "tsVideoAttributes.h"
+#include "tsVideoStreamDescriptor.h"
+#include "tsVideoWindowDescriptor.h"
 #include "tsWebRequest.h"
 #include "tsxml.h"
 #include "tsxmlAttribute.h"

@@ -26,95 +26,104 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 //
 //----------------------------------------------------------------------------
-//
-//  Transport stream processor shared library:
-//  Generic packet processor plugin, template for new plugins
-//
-//----------------------------------------------------------------------------
 
-#include "tsduck.h"
+#include "tsMPEG4VideoDescriptor.h"
+#include "tsNames.h"
+#include "tsTablesDisplay.h"
+#include "tsTablesFactory.h"
+#include "tsxmlElement.h"
 TSDUCK_SOURCE;
 
+#define MY_XML_NAME u"MPEG4_video_descriptor"
+#define MY_DID ts::DID_MPEG4_VIDEO
+
+TS_XML_DESCRIPTOR_FACTORY(ts::MPEG4VideoDescriptor, MY_XML_NAME);
+TS_ID_DESCRIPTOR_FACTORY(ts::MPEG4VideoDescriptor, ts::EDID::Standard(MY_DID));
+TS_ID_DESCRIPTOR_DISPLAY(ts::MPEG4VideoDescriptor::DisplayDescriptor, ts::EDID::Standard(MY_DID));
+
 
 //----------------------------------------------------------------------------
-// Plugin definition
+// Constructors
 //----------------------------------------------------------------------------
 
-namespace ts {
-    class GenericPlugin: public ProcessorPlugin
-    {
-    public:
-        // Implementation of plugin API
-        GenericPlugin(TSP*);
-        virtual bool start() override;
-        virtual bool stop() override;
-        virtual BitRate getBitrate() override;
-        virtual Status processPacket(TSPacket&, bool&, bool&) override;
-
-    private:
-        // Inaccessible operations
-        GenericPlugin() = delete;
-        GenericPlugin(const GenericPlugin&) = delete;
-        GenericPlugin& operator=(const GenericPlugin&) = delete;
-    };
+ts::MPEG4VideoDescriptor::MPEG4VideoDescriptor() :
+    AbstractDescriptor(MY_DID, MY_XML_NAME),
+    MPEG4_visual_profile_and_level(0)
+{
+    _is_valid = true;
 }
 
-TSPLUGIN_DECLARE_VERSION
-TSPLUGIN_DECLARE_PROCESSOR(generic, ts::GenericPlugin)
-
-
-//----------------------------------------------------------------------------
-// Constructor
-//----------------------------------------------------------------------------
-
-ts::GenericPlugin::GenericPlugin(TSP* tsp_) :
-    ProcessorPlugin(tsp_, u"Generic packet processor.", u"[options]")
+ts::MPEG4VideoDescriptor::MPEG4VideoDescriptor(const Descriptor& desc, const DVBCharset* charset) :
+    MPEG4VideoDescriptor()
 {
-    setHelp(u"Options:\n"
-            u"\n"
-            u"  --help\n"
-            u"      Display this help text.\n"
-            u"\n"
-            u"  --version\n"
-            u"      Display the version number.\n");
+    deserialize(desc, charset);
 }
 
 
 //----------------------------------------------------------------------------
-// Start method
+// Serialization
 //----------------------------------------------------------------------------
 
-bool ts::GenericPlugin::start()
+void ts::MPEG4VideoDescriptor::serialize(Descriptor& desc, const DVBCharset* charset) const
 {
-    return true;
+    ByteBlockPtr bbp(serializeStart());
+    bbp->appendUInt8(MPEG4_visual_profile_and_level);
+    serializeEnd(desc, bbp);
 }
 
 
 //----------------------------------------------------------------------------
-// Stop method
+// Deserialization
 //----------------------------------------------------------------------------
 
-bool ts::GenericPlugin::stop()
+void ts::MPEG4VideoDescriptor::deserialize(const Descriptor& desc, const DVBCharset* charset)
 {
-    return true;
+    const uint8_t* data = desc.payload();
+    size_t size = desc.payloadSize();
+    
+    _is_valid = desc.isValid() && desc.tag() == _tag && size == 1;
+
+    if (_is_valid) {
+        MPEG4_visual_profile_and_level = data[0];
+    }
 }
 
 
 //----------------------------------------------------------------------------
-// New bitrate computation method, return zero if unknown
+// Static method to display a descriptor.
 //----------------------------------------------------------------------------
 
-ts::BitRate ts::GenericPlugin::getBitrate()
+void ts::MPEG4VideoDescriptor::DisplayDescriptor(TablesDisplay& display, DID did, const uint8_t* data, size_t size, int indent, TID tid, PDS pds)
 {
-    return 0;
+    std::ostream& strm(display.out());
+    const std::string margin(indent, ' ');
+
+    if (size >= 1) {
+        strm << margin << UString::Format(u"MPEG-4 Video profile and level: 0x%X (%d)", {data[0], data[0]}) << std::endl;
+        data++; size--;
+    }
+
+    display.displayExtraData(data, size, indent);
 }
 
 
 //----------------------------------------------------------------------------
-// Packet processing method
+// XML serialization
 //----------------------------------------------------------------------------
 
-ts::ProcessorPlugin::Status ts::GenericPlugin::processPacket(TSPacket& pkt, bool& flush, bool& bitrate_changed)
+void ts::MPEG4VideoDescriptor::buildXML(xml::Element* root) const
 {
-    return TSP_OK;
+    root->setIntAttribute(u"MPEG4_visual_profile_and_level", MPEG4_visual_profile_and_level, true);
+}
+
+
+//----------------------------------------------------------------------------
+// XML deserialization
+//----------------------------------------------------------------------------
+
+void ts::MPEG4VideoDescriptor::fromXML(const xml::Element* element)
+{
+    _is_valid =
+        checkXMLName(element) &&
+        element->getIntAttribute<uint8_t>(MPEG4_visual_profile_and_level, u"MPEG4_visual_profile_and_level", true);
 }

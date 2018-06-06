@@ -54,6 +54,7 @@ namespace ts {
         DVBInput(TSP*);
         virtual bool start() override;
         virtual bool stop() override;
+        virtual bool isRealTime() override {return true;}
         virtual BitRate getBitrate() override;
         virtual size_t receive(TSPacket*, size_t) override;
 
@@ -83,7 +84,7 @@ TSPLUGIN_DECLARE_INPUT(dvb, ts::DVBInput)
 //----------------------------------------------------------------------------
 
 ts::DVBInput::DVBInput(TSP* tsp_) :
-    InputPlugin(tsp_, u"DVB receiver device input.", u"[options]"),
+    InputPlugin(tsp_, u"DVB receiver device input", u"[options]"),
     _com(*tsp_),
     _tuner(),
     _tuner_args(false, true),

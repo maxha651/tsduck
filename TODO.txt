@@ -5,23 +5,8 @@ TSDuck - List of features to be implemented or fixed
 * Implement missing PSI/SI tables and descriptors (list below).
 
   ISO/IEC 13818-1 / H.222 (MPEG system layer)
-  - 2.6.2   video_stream_descriptor
-  - 2.6.4   audio_stream_descriptor
-  - 2.6.6   hierarchy_descriptor
-  - 2.6.10  data_stream_alignment_descriptor
-  - 2.6.12  target_background_grid_descriptor
-  - 2.6.14  video_window_descriptor
-  - 2.6.20  system_clock_descriptor
-  - 2.6.22  multiplex_buffer_utilization_descriptor
-  - 2.6.24  copyright_descriptor
-  - 2.6.30  smoothing_buffer_descriptor
-  - 2.6.34  IBP_descriptor
-  - 2.6.36  MPEG-4_video_descriptor
-  - 2.6.38  MPEG-4_audio_descriptor
   - 2.6.40  IOD_descriptor
-  - 2.6.42  SL_descriptor
   - 2.6.44  FMC_descriptor
-  - 2.6.46  external_ES_ID_descriptor
   - 2.6.48  muxcode_descriptor
   - 2.6.50  FmxBufferSize_descriptor
   - 2.6.52  MultiplexBuffer_descriptor
@@ -55,14 +40,10 @@ TSDuck - List of features to be implemented or fixed
   - 6.4.5.4  C2_bundle_delivery_system_descriptor
   - 6.4.6    image_icon_descriptor
   - 6.4.8    network_change_notify_descriptor
-  - 6.4.9    service_relocated_descriptor
   - 6.4.11   target_region_descriptor
   - 6.4.12   target_region_name_descriptor
   - 6.4.14   URI_linkage_descriptor
   - 6.4.15   video_depth_range_descriptor
-  - 7.1.1    Discontinuity Information Table (DIT)
-  - 7.1.2    Selection Information Table (SIT)
-  - 7.2.1    partial_transport_stream_descriptor
   - G.3.1    DTS-HD_audio_stream_descriptor
   - L.1      DTS_Neural_descriptor
 

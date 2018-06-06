@@ -26,12 +26,9 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 //
 //----------------------------------------------------------------------------
-//
-//  TCP Server
-//
-//----------------------------------------------------------------------------
 
 #include "tsTCPServer.h"
+#include "tsIPUtils.h"
 #include "tsGuard.h"
 #include "tsMemoryUtils.h"
 TSDUCK_SOURCE;

@@ -1,3 +1,3 @@
 CONFIG += tsplugin
-TARGET = tsplugin_generic
+TARGET = tsplugin_merge
 include(../tsduck.pri)
